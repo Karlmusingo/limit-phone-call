@@ -48,7 +48,7 @@ import java.util.Date
 class MainActivity : ComponentActivity() {
 
     private var telecomManager: TelecomManager? = null
-
+    private lateinit var callLogs: ArrayList<Map<String, String>>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,32 +82,41 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.READ_CALL_LOG), 369)
         }
 
-        val logs = getCallLogs()
+        callLogs = getCallLogs()
+
+        println(callLogs)
 
         setContent {
-            CallLogHistory(logs)
+            CallLogHistory()
         }
 
     }
 
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+
+        if(hasFocus) {
+            println(hasFocus)
+            callLogs = getCallLogs()
+        }
+    }
+
     fun getCallLogs(): ArrayList<Map<String, String>> {
         println("Get call logs")
-        val flag = 1
-//        title.setText(Html.fromHtml("<b>Call Logs</b>"))
-//        deviceDetails.setText(Html.fromHtml(""))
-        val callLogs = StringBuilder()
         val calllogsBuffer = ArrayList<String>()
 
         val callLogsMap = ArrayList<Map<String, String>>()
         calllogsBuffer.clear()
-        val managedCursor: Cursor = managedQuery(
+
+        val managedCursor: Cursor? = this.contentResolver.query(
             CallLog.Calls.CONTENT_URI,
             null, null, null, null
         )
-        val number: Int = managedCursor.getColumnIndex(CallLog.Calls.NUMBER)
+        val number: Int = managedCursor!!.getColumnIndex(CallLog.Calls.NUMBER)
         val type: Int = managedCursor.getColumnIndex(CallLog.Calls.TYPE)
         val date: Int = managedCursor.getColumnIndex(CallLog.Calls.DATE)
         val duration: Int = managedCursor.getColumnIndex(CallLog.Calls.DURATION)
+
         while (managedCursor.moveToNext()) {
             val phNumber: String = managedCursor.getString(number)
             val callType: String = managedCursor.getString(type)
@@ -121,29 +130,29 @@ class MainActivity : ComponentActivity() {
                 CallLog.Calls.INCOMING_TYPE -> dir = "INCOMING"
                 CallLog.Calls.MISSED_TYPE -> dir = "MISSED"
             }
-            calllogsBuffer.add(
-                """
-Phone Number: $phNumber 
-Call Type: $dir 
-Call Date: $callDayTime 
-Call duration in sec : $callDuration
-"""
+
+            val theMap = mapOf(
+                "phoneNumber" to phNumber,
+                "type" to dir,
+                "callDuration" to callDuration,
+                "callTime" to callDayTime.toString()
             )
 
-            val theMap = mapOf("phoneNumber" to phNumber, "type" to dir, "callDuration" to callDuration, "callTime" to callDayTime.toString())
-
             callLogsMap.add(theMap)
-
-            println("""
-Phone Number: $phNumber 
-Call Type: $dir 
-Call Date: $callDayTime 
-Call duration in sec : $callDuration
-""")
         }
         managedCursor.close()
 
         return callLogsMap
+    }
+
+    @Composable
+    fun CallLogHistory() {
+        LazyColumn() {
+            items(callLogs.reversed()){ log ->
+                LogItem(log)
+            }
+        }
+
     }
 
 
@@ -162,15 +171,7 @@ fun DefaultPreview() {
     }
 }
 
-@Composable
-fun CallLogHistory(logs: ArrayList<Map<String, String>>) {
-    LazyColumn() {
-        items(logs){ log ->
-            LogItem(log)
-        }
-    }
 
-}
 
 @Composable
 fun LogItem(log: Map<String, String>) {
